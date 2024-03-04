@@ -1,0 +1,23 @@
+{
+    "compilerOptions": {
+      "module": "CommonJS",
+      "esModuleInterop": true,
+      "target": "es6",
+      "strict": true,
+      "moduleResolution": "node",
+      "sourceMap": true,
+      "outDir": "dist",
+      "baseUrl": "src",
+      "paths": {
+        "@app":["app/"],
+        "@utils":["utils"],
+        "@config":["config/"],
+        "@models":["database/models/"],
+        "@services":["services/"],
+        "@types":["types/"],
+        "@middlewares":["middlewares/"],
+        "@controllers":["controllers/"],
+        "@routes":["routes/"],
+      }
+    },
+  }
