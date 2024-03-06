@@ -1,0 +1,8 @@
+# Ignore .evm files
+.env
+
+# Ignore controllers/_old.user.controllers.ts
+src/controllers/_old.user.controller.ts
+
+# Ignore npm modules
+node_modules

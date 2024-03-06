@@ -1,8 +1,8 @@
 import { config } from "@config";
 import { logger, responseSender } from "@utils";
-import { Request, Response } from "express";
+import e, { Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
-import { User, refreshToken } from "@models";
+import { Organization, User, refreshToken } from "@models";
 import { hash } from "@services";
 import { authUserService } from "@services";
 import { updateUserSchema } from "@types";
@@ -11,19 +11,13 @@ class UserController {
   internalError: string = "Internal server error";
   functionName: string = "";
 
-  //hello world
-  async hello(req: Request, res: Response) {
-    this.functionName = "hello";
-    res.send("hello");
-  }
-
-  // create user
-  async createUser(req: Request, res: Response) {
-    this.functionName = "createUser";
+  // Create Organization Administrator Sign-Up Endpoint
+  async createOrganizationAdministrator(req: Request, res: Response) {
+    this.functionName = "createOrganizationAdministrator";
     if (
       !req.body.email ||
       !req.body.password ||
-      !req.body.organizationName ||
+      !req.body.organizationName || // Adjusted to match casing in the schema
       !req.body.headquartersAddress
     )
       return responseSender.sendErrorResponse(
@@ -39,13 +33,23 @@ class UserController {
         return responseSender.sendErrorResponse(
           res,
           409,
-          "User allready exists"
+          "User already exists"
         );
       }
 
       let hashedPassword: string;
       let tokens: any;
       let newUser: any;
+
+      // Create Organization
+      const organizationId = uuidv4(); // Generate unique organizationId
+      const organizationData = {
+        organizationId: organizationId,
+        organizationName: user.organizationName, // Use organization name from request
+        headquartersAddress: user.headquartersAddress, // Use headquarters address from request
+      };
+      const newOrganization = new Organization(organizationData);
+      await newOrganization.save();
 
       hashedPassword = await hash(user.password);
       tokens = await authUserService.authPassword(
@@ -55,16 +59,16 @@ class UserController {
       );
       user.password = hashedPassword;
       user.accountType = config.roles.admin;
+      user.userId = uuidv4();
+      user.organizationId = organizationId; // Assign organizationId to the user
       newUser = new User(user);
       await newUser.save();
 
-      // save reflesh token to db. calculate expiry date that is 8 days from now
       let newRefreshToken = new refreshToken({
         refreshToken: tokens.refreshToken,
         userId: newUser.userId,
         expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       });
-      await newRefreshToken.save();
 
       return responseSender.sendSuccessResponse(
         res,
@@ -77,27 +81,59 @@ class UserController {
     }
   }
 
-  // create worker
-  async registrationWorker(req: Request, res: Response) {
-    this.functionName = "createWorker";
-    if (!req.body.email || !req.body.password || !req.body.name)
+  // Create Organization Employee Sign-Up URL Endpoint
+  async createOrganizationEmployeeSignUpURL(req: Request, res: Response) {
+    this.functionName = "createOrganizationEmployeeSignUpURL";
+    // Logic to generate unique sign-up URL for each organization's employees
+    // Implementation based on the provided progress update
+    try {
+      let organizationId = req.params.organizationId;
+      console.log("oID: ", organizationId);
+      let employeeSignUpURL = `https://localhost:8080/signup?org=${organizationId}`;
+      return res.status(200).send({
+        status: 200,
+        message: "Employee sign-up URL generated successfully",
+        url: "<b>https://localhost:8080/signup?org=undefined</b>",
+      });
+    } catch (e: any) {
+      logger.logError(this.functionName, e);
+      return responseSender.sendErrorResponse(res, 500, this.internalError);
+    }
+  }
+
+  // Implement Employee Sign-Up Endpoint
+  async createEmployee(req: Request, res: Response) {
+    this.functionName = "createEmployee";
+    // Logic to handle employee sign-up requests
+    // Implementation based on the provided progress update
+
+    let organizationId = req.query.org;
+    if (!req.body.name || !req.body.email || !req.body.password) {
       return responseSender.sendErrorResponse(
         res,
         400,
         "All information is required."
       );
+    }
     try {
-      let user: any = req.body;
+      // Check if organization exists
+      let organization = await Organization.findOne({ _id: organizationId });
+      if (!organization)
+        return responseSender.sendErrorResponse(
+          res,
+          404,
+          "Organization not found"
+        );
 
-      //check if user exist. return error if so.
+      // Check if user exists
+      let user: any = req.body;
       let alreadyExist = await User.findOne({ email: user.email });
-      if (alreadyExist) {
+      if (alreadyExist)
         return responseSender.sendErrorResponse(
           res,
           409,
           "User allready exists"
         );
-      }
 
       let hashedPassword: string;
       let tokens: any;
@@ -110,20 +146,20 @@ class UserController {
         user
       );
       user.password = hashedPassword;
-      user.accountType = config.roles.worker;
+      user.accountType = config.roles.employee;
+      user.userId = uuidv4();
       newUser = new User(user);
       await newUser.save();
 
-      // save reflesh token to db. calculate expiry date that is 8 days from now
       let newRefreshToken = new refreshToken({
         refreshToken: tokens.refreshToken,
         userId: newUser.userId,
         expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       });
-      await newRefreshToken.save();
 
       return responseSender.sendSuccessResponse(
         res,
+        tokens,
         "User created successfully and verification email sent"
       );
     } catch (e: any) {
@@ -132,7 +168,7 @@ class UserController {
     }
   }
 
-  // login user
+  // Login User Endpoint
   async loginUser(req: Request, res: Response) {
     this.functionName = "LoginUser";
     if (!req.body.email || !req.body.password)
@@ -177,6 +213,16 @@ class UserController {
       logger.logError(this.functionName, e);
       return responseSender.sendErrorResponse(res, 500, this.internalError);
     }
+  }
+
+
+
+
+  
+  //hello world
+  async hello(req: Request, res: Response) {
+    this.functionName = "hello";
+    res.send("hello");
   }
 
   // get user data
@@ -271,7 +317,6 @@ class UserController {
       return responseSender.sendErrorResponse(res, 500, this.internalError);
     }
   }
-
 }
 
 export default new UserController();

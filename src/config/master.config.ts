@@ -14,7 +14,7 @@ let config = {
 
     roles: {
         admin: "admin",
-        worker: "worker",
+        employee: "employee",
         projectManager: "projectManager",
         departmentManager: "departmentManager",
     },

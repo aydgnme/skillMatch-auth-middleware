@@ -7,15 +7,17 @@ import { authToken } from "middleware";
 // initialize user router
 let userRouter = Router();
 
+// endpoint to Create Organization Administrator
+userRouter.post("/createOrganizationAdministrator", (req, res) => userController.createOrganizationAdministrator(req, res));
 
-// endpoint to create new user
-userRouter.post("/register", (req, res) => userController.createUser(req, res));
+// endpoint to Create Organization Employee SignUp URL
+userRouter.post("/createOrganizationEmployeeSignUpURL", (req, res) => userController.createOrganizationEmployeeSignUpURL(req, res));
+
+// endpoint to Create Organization Employee
+userRouter.post("/signup/:organizationId", (req, res) => userController.createEmployee(req, res));
 
 // endpoint to login user
 userRouter.post("/login", (req, res) => userController.loginUser(req, res));
-
-// endpoint to create new worker
-userRouter.post("/Register-worker/:organizationLink", (req, res) => userController.registrationWorker(req, res));
 
 
 // endpoint to get user data. needs access token in header
