@@ -2,7 +2,7 @@ import { config } from "@config";
 import { logger, responseSender } from "@utils";
 import { Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
-import { Organization, User, refreshToken } from "@models";
+import { Organization, User, refreshToken, Url } from "@models";
 import { authUserService, hash } from "@services";
 import { updateUserSchema, UserSchema, UserType } from "@types";
 
@@ -82,6 +82,9 @@ class UserController {
         expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       });
 
+      // Save the new refresh token
+      await newRefreshToken.save();
+
       return responseSender.sendSuccessResponse(
         res,
         tokens,
@@ -96,33 +99,33 @@ class UserController {
   // Create Organization Employee Sign-Up URL Endpoint
   async createOrganizationEmployeeSignUpURL(req: Request, res: Response) {
     this.functionName = "createOrganizationEmployeeSignUpURL";
-    // Logic to generate unique sign-up URL for each organization's employees
-    // Implementation based on the provided progress update
     try {
       let organization: any = req.body;
-      //check if Organization doesn't exist. return error if so.
-      let alreadyExist = await Organization.findOne({
-        organizationId: organization.organizationId,
+      let foundOrganization = await Organization.findOne({
+        organizationName: organization.organizationName,
       });
-      if (!alreadyExist) {
+      if (!foundOrganization) {
         return responseSender.sendErrorResponse(
           res,
-          500,
-          "Organization doesn't exist"
+          404,
+          "Organization not found"
         );
       }
-      console.log("oID: ", organization.organizationId);
-      let employeeSignUpURL = `https://localhost:8080/signup?org=${organization.organizationId}`;
 
-      // Store the generated URL in the database or any other suitable storage mechanism
-      await Organization.findOneAndUpdate(
-        { organizationId: organization.organizationId },
-        { employeeSignUpURL: employeeSignUpURL }
-      );
-      return res.status(200).send({
-        status: 200,
-        message: "Employee sign-up URL generated successfully",
-        url: employeeSignUpURL,
+      let url =
+        Math.random().toString(36).substring(2, 15) +
+        Math.random().toString(36).substring(2, 15);
+
+      // Url modelini oluştururken organizationId ve url alanlarını belirtiyoruz
+      await Url.create({
+        organizationId: foundOrganization._id,
+        url,
+        used: false,
+      });
+
+      //url = `${url}
+      return res.send({
+        url,
       });
     } catch (e: any) {
       logger.logError(this.functionName, e);
@@ -131,11 +134,13 @@ class UserController {
     }
   }
 
-  // Implement Employee Sign-Up Endpoint
-  async createEmployee(req: Request, res: Response) {
-    this.functionName = "createEmployee";
-    // Logic to handle employee sign-up requests
-    // Implementation based on the provided progress update
+  // Create Organization Employee Sign-Up Endpoint
+  async createEmployeeWithSignUpURL(
+    req: Request,
+    res: Response,
+    signUpURL: string
+  ) {
+    this.functionName = "createEmployeeWithSignUpURL";
     try {
       // Extract employee information from request body
       const { name, email, password, organizationId } = req.body;
@@ -148,9 +153,9 @@ class UserController {
           "Organization ID is required"
         );
       }
-    
+
       // Check if the organization exists
-      const organization = await Organization.findOne({ organizationId });
+      let organization = await Organization.findOne({ organizationId });
       if (!organization) {
         return responseSender.sendErrorResponse(
           res,
@@ -160,7 +165,7 @@ class UserController {
       }
 
       let user: any = req.body;
-      let alreadyExist = await User.findOne({ email: user.email});
+      let alreadyExist = await User.findOne({ email: user.email });
       if (alreadyExist) {
         return responseSender.sendErrorResponse(
           res,
@@ -175,14 +180,14 @@ class UserController {
       // Create new User instance (assuming User model represents employees)
       hashedPassword = await hash(user.password);
       tokens = await authUserService.authPassword(
-        user.password  + String(process.env.SALT_PASSWORD),
+        user.password + String(process.env.SALT_PASSWORD),
         hashedPassword,
         user
       );
 
       user.password = hashedPassword;
       user.accountType = config.roles.employee;
-      user.userId = uuidv4()
+      user.userId = uuidv4();
       user.organizationId = organizationId;
       user.headquartersAddress = organization.headquartersAddress;
       user.organizationName = organization.organizationName;
@@ -194,6 +199,9 @@ class UserController {
         userId: newUser.userId,
         expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       });
+
+      // Mark the URL as used in the database
+      await Url.findOneAndUpdate({ url: signUpURL }, { used: true });
 
       // Return success response
       return res.status(201).send({
@@ -216,7 +224,9 @@ class UserController {
     this.functionName = "getUserData";
     try {
       let userId = req.params.userId || req.body.user.userId;
-      let user: any = await User.findOne({ userId: userId }).select("-password");
+      let user: any = await User.findOne({ userId: userId }).select(
+        "-password"
+      );
       if (!user) {
         return responseSender.sendErrorResponse(res, 404, "User not found");
       }
@@ -307,6 +317,7 @@ class UserController {
       return responseSender.sendErrorResponse(res, 500, this.internalError);
     }
   }
+  
 
   //hello world
   async hello(req: Request, res: Response) {
@@ -318,17 +329,21 @@ class UserController {
   async updateUserData(req: Request, res: Response) {
     this.functionName = "updateUserData";
     try {
-      let data = req.body;
-      const { user, ...updateData } = data;
+      const userId = req.params.userId; // Extract the userId from the URL parameters
+      const updateData = req.body; // Get the update data from the request body
+
+      // Update the user data based on userId
       const updatedUser: any = await User.findOneAndUpdate(
-        { userId: data.user.userId },
-        { $set: updateData },
-        { new: true }
+        { userId: userId }, // Find the user by userId
+        { $set: updateData }, // Set the update data
+        { new: true } // Return the updated document
       );
+
       if (!updatedUser) {
         return responseSender.sendErrorResponse(res, 404, "User not found");
       }
 
+      // Validate the updated data if needed
       let validation = updateUserSchema.safeParse(updateData);
       if (!validation.success) {
         return responseSender.sendErrorResponse(
@@ -337,6 +352,9 @@ class UserController {
           validation.error.message
         );
       }
+
+      // Return success response with the updated user data
+      return res.status(200).json(updatedUser);
     } catch (e: any) {
       logger.logError(this.functionName, e);
       return responseSender.sendErrorResponse(res, 500, this.internalError);

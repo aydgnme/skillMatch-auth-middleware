@@ -49,4 +49,6 @@ To run this project, you will need to add the following environment variables to
 
 `DB_CONNECTION_URL`
 
+`CORS_ORIGIN`
+
 
