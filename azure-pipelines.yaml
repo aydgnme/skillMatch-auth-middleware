@@ -29,7 +29,7 @@ steps:
     inputs:
       azureSubscription: 'script-squad-service-connection'
       appType: 'webAppLinux'
-      appName: "atc-2024-script-squad-be-linux-web-app"
+      appName: "atc-2024-scriptsquad-be-linux-web-app"
       runtimeStack: 'NODE|20.x'
       package: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
       startUpCommand: 'npm start'
