@@ -1,11 +1,10 @@
 import { config } from "@config";
 import { logger, responseSender } from "@utils";
-import e, { Request, Response } from "express";
+import { Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { Organization, User, refreshToken } from "@models";
-import { hash } from "@services";
-import { authUserService } from "@services";
-import { updateUserSchema } from "@types";
+import { authUserService, hash } from "@services";
+import { updateUserSchema, UserSchema, UserType } from "@types";
 
 class UserController {
   internalError: string = "Internal server error";
@@ -41,14 +40,26 @@ class UserController {
       let tokens: any;
       let newUser: any;
 
+      //check if organization exist. return error if so.
+      let organization = req.body;
+      let allready = await Organization.findOne({
+        organizationName: organization.organizationName,
+      });
+      if (allready) {
+        return responseSender.sendErrorResponse(
+          res,
+          409,
+          "Organization already exists"
+        );
+      }
       // Create Organization
-      const organizationId = uuidv4(); // Generate unique organizationId
-      const organizationData = {
+      let organizationId = uuidv4(); // Generate unique organizationId
+      let organizationData = {
         organizationId: organizationId,
         organizationName: user.organizationName, // Use organization name from request
         headquartersAddress: user.headquartersAddress, // Use headquarters address from request
       };
-      const newOrganization = new Organization(organizationData);
+      let newOrganization = new Organization(organizationData);
       await newOrganization.save();
 
       hashedPassword = await hash(user.password);
@@ -57,6 +68,7 @@ class UserController {
         hashedPassword,
         user
       );
+
       user.password = hashedPassword;
       user.accountType = config.roles.admin;
       user.userId = uuidv4();
@@ -87,16 +99,34 @@ class UserController {
     // Logic to generate unique sign-up URL for each organization's employees
     // Implementation based on the provided progress update
     try {
-      let organizationId = req.params.organizationId;
-      console.log("oID: ", organizationId);
-      let employeeSignUpURL = `https://localhost:8080/signup?org=${organizationId}`;
+      let organization: any = req.body;
+      //check if Organization doesn't exist. return error if so.
+      let alreadyExist = await Organization.findOne({
+        organizationId: organization.organizationId,
+      });
+      if (!alreadyExist) {
+        return responseSender.sendErrorResponse(
+          res,
+          500,
+          "Organization doesn't exist"
+        );
+      }
+      console.log("oID: ", organization.organizationId);
+      let employeeSignUpURL = `https://localhost:8080/signup?org=${organization.organizationId}`;
+
+      // Store the generated URL in the database or any other suitable storage mechanism
+      await Organization.findOneAndUpdate(
+        { organizationId: organization.organizationId },
+        { employeeSignUpURL: employeeSignUpURL }
+      );
       return res.status(200).send({
         status: 200,
         message: "Employee sign-up URL generated successfully",
-        url: "<b>https://localhost:8080/signup?org=undefined</b>",
+        url: employeeSignUpURL,
       });
     } catch (e: any) {
       logger.logError(this.functionName, e);
+      console.log(req.body);
       return responseSender.sendErrorResponse(res, 500, this.internalError);
     }
   }
@@ -106,48 +136,56 @@ class UserController {
     this.functionName = "createEmployee";
     // Logic to handle employee sign-up requests
     // Implementation based on the provided progress update
-
-    let organizationId = req.query.org;
-    if (!req.body.name || !req.body.email || !req.body.password) {
-      return responseSender.sendErrorResponse(
-        res,
-        400,
-        "All information is required."
-      );
-    }
     try {
-      // Check if organization exists
-      let organization = await Organization.findOne({ _id: organizationId });
-      if (!organization)
+      // Extract employee information from request body
+      const { name, email, password, organizationId } = req.body;
+
+      // Check if organizationId is provided
+      if (!organizationId) {
+        return responseSender.sendErrorResponse(
+          res,
+          400,
+          "Organization ID is required"
+        );
+      }
+    
+      // Check if the organization exists
+      const organization = await Organization.findOne({ organizationId });
+      if (!organization) {
         return responseSender.sendErrorResponse(
           res,
           404,
           "Organization not found"
         );
+      }
 
-      // Check if user exists
       let user: any = req.body;
-      let alreadyExist = await User.findOne({ email: user.email });
-      if (alreadyExist)
+      let alreadyExist = await User.findOne({ email: user.email});
+      if (alreadyExist) {
         return responseSender.sendErrorResponse(
           res,
           409,
-          "User allready exists"
+          "User already exists"
         );
+      }
 
       let hashedPassword: string;
       let tokens: any;
       let newUser: any;
-
+      // Create new User instance (assuming User model represents employees)
       hashedPassword = await hash(user.password);
       tokens = await authUserService.authPassword(
-        user.password + String(process.env.SALT_PASSWORD),
+        user.password  + String(process.env.SALT_PASSWORD),
         hashedPassword,
         user
       );
+
       user.password = hashedPassword;
       user.accountType = config.roles.employee;
-      user.userId = uuidv4();
+      user.userId = uuidv4()
+      user.organizationId = organizationId;
+      user.headquartersAddress = organization.headquartersAddress;
+      user.organizationName = organization.organizationName;
       newUser = new User(user);
       await newUser.save();
 
@@ -157,11 +195,37 @@ class UserController {
         expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       });
 
-      return responseSender.sendSuccessResponse(
+      // Return success response
+      return res.status(201).send({
+        status: 201,
+        message: "Employee signed up successfully",
+        employee: newUser,
+      });
+    } catch (error: any) {
+      logger.logError(this.functionName, error);
+      return responseSender.sendErrorResponse(
         res,
-        tokens,
-        "User created successfully and verification email sent"
+        500,
+        "Error signing up employee"
       );
+    }
+  }
+
+  // Get User Data Endpoint
+  async getUserData(req: Request, res: Response) {
+    this.functionName = "getUserData";
+    try {
+      let userId = req.params.userId || req.body.user.userId;
+      let user: any = await User.findOne({ userId: userId }).select("-password");
+      if (!user) {
+        return responseSender.sendErrorResponse(res, 404, "User not found");
+      }
+      let response = {
+        status: 200,
+        message: "User data retrieved",
+        data: user,
+      };
+      return responseSender.sendSuccessResponse(res, response);
     } catch (e: any) {
       logger.logError(this.functionName, e);
       return responseSender.sendErrorResponse(res, 500, this.internalError);
@@ -215,32 +279,39 @@ class UserController {
     }
   }
 
-
-
-
-  
-  //hello world
-  async hello(req: Request, res: Response) {
-    this.functionName = "hello";
-    res.send("hello");
-  }
-
-  // get user data
-  async getUserData(req: Request, res: Response) {
-    this.functionName = "getUserData";
+  // Delete User Endpoint
+  async deleteUser(req: Request, res: Response) {
+    this.functionName = "deleteUser";
     try {
-      let userId = req.params.userId || req.body.userId;
-      let user: any = await User.findOne({ userId: userId }).select(
-        "-password -__v"
-      );
-      if (!user)
+      let userId = req.params.userId || req.body.user.userId;
+      let result = await User.findOneAndDelete({ userId: userId });
+      if (!result) {
         return responseSender.sendErrorResponse(res, 404, "User not found");
-      let response = { satatus: 200, data: user };
-      return responseSender.sendSuccessResponse(res, response);
+      }
+      //delete all refresh tokens for user
+      try {
+        let refreshTokens = await refreshToken.deleteMany({ userId: userId });
+        if (!refreshTokens)
+          console.error(`Error deleting refresh token for user ${userId}`);
+      } catch (e: any) {
+        logger.logError(this.functionName, e);
+        console.error(e);
+      }
+      return responseSender.sendSuccessResponse(
+        res,
+        "",
+        "User deleted successfully"
+      );
     } catch (e: any) {
       logger.logError(this.functionName, e);
       return responseSender.sendErrorResponse(res, 500, this.internalError);
     }
+  }
+
+  //hello world
+  async hello(req: Request, res: Response) {
+    this.functionName = "hello";
+    res.send("hello");
   }
 
   // update user data
@@ -266,33 +337,6 @@ class UserController {
           validation.error.message
         );
       }
-    } catch (e: any) {
-      logger.logError(this.functionName, e);
-      return responseSender.sendErrorResponse(res, 500, this.internalError);
-    }
-  }
-
-  // delete user
-  async deleteUser(req: Request, res: Response) {
-    this.functionName = "deleteUser";
-    try {
-      let userId = req.body.user.userId || req.params.userId;
-      let result = await User.findOneAndDelete({ userId: userId });
-      if (!result) {
-        return responseSender.sendErrorResponse(res, 404, "User not found");
-      }
-      // delete refresh token
-      try {
-        let refleshTokens = await refreshToken.deleteMany({ userId: userId });
-        if (!refleshTokens)
-          console.error(`Error deleting refresh token for user ${userId}`);
-      } catch (e: any) {
-        console.error(e);
-      }
-      return responseSender.sendSuccessResponse(
-        res,
-        "User deleted successfully"
-      );
     } catch (e: any) {
       logger.logError(this.functionName, e);
       return responseSender.sendErrorResponse(res, 500, this.internalError);

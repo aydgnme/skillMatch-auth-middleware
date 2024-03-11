@@ -1,53 +1,65 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { config } from "@config";
-import { userController } from "@controllers"
+import { userController } from "@controllers";
 import { authToken } from "middleware";
-
+import bodyParser from "body-parser"; // Import body-parser
 
 // initialize user router
 let userRouter = Router();
 
+// Use body-parser middleware
+userRouter.use(bodyParser.json());
+
 // endpoint to Create Organization Administrator
-userRouter.post("/createOrganizationAdministrator", (req, res) => userController.createOrganizationAdministrator(req, res));
+userRouter.post("/createOrganizationAdministrator", (req: Request, res: Response) =>
+  userController.createOrganizationAdministrator(req, res)
+);
 
 // endpoint to Create Organization Employee SignUp URL
-userRouter.post("/createOrganizationEmployeeSignUpURL", (req, res) => userController.createOrganizationEmployeeSignUpURL(req, res));
+userRouter.post("/createOrganizationEmployeeSignUpURL", (req: Request, res: Response) =>
+  userController.createOrganizationEmployeeSignUpURL(req, res)
+);
 
 // endpoint to Create Organization Employee
-userRouter.post("/signup/:organizationId", (req, res) => userController.createEmployee(req, res));
+userRouter.post("/signup", (req: Request, res: Response) =>
+  userController.createEmployee(req, res)
+);
 
 // endpoint to login user
-userRouter.post("/login", (req, res) => userController.loginUser(req, res));
+userRouter.post("/login", (req: Request, res: Response) => userController.loginUser(req, res));
 
+// endpoint to get user data as admin
+userRouter.get("/:userId", (req: Request, res: Response) => userController.getUserData(req, res));
 
 // endpoint to get user data. needs access token in header
-userRouter.get("/:userId", (req, res) => userController.getUserData(req, res));
+userRouter.get("/", authToken, (req: Request, res: Response) =>
+  userController.getUserData(req, res)
+);
 
 // update to update user data as admin.
-userRouter.put("/:userId", (req, res) => userController.updateUserData(req, res));
+userRouter.put("/:userId", (req: Request, res: Response) =>
+  userController.updateUserData(req, res)
+);
 
 //  update user data.
-userRouter.put("/", (req, res) => userController.updateUserData(req, res));
+userRouter.put("/", (req: Request, res: Response) => userController.updateUserData(req, res));
 
-// endpoint to delete role.
-//userRouter.delete("/deleteRole/:userId", (req, res) => userController.deleteRole(req, res));
-
-
-/*
-// endpoint to get user data as admin
-userRouter.get("/:userId", (req, res) => userController.getUserData(req, res));
-
-//  update user data.
-userRouter.put("/", (req, res) => userController.updateUserData(req, res));
-
-
+// endpoint for admin to delete user. userId of user to delete is passed as parameter.
+userRouter.delete("/delete/:userId", (req: Request, res: Response) =>
+  userController.deleteUser(req, res)
+);
 
 // endpoint to delte user. called by user with authentification token. check token and get user Id and delete user.
-userRouter.delete("/delete", (req, res) => userController.deleteUser(req, res));
-*/
-
-userRouter.get('/hello', (req, res) => 
-    userController.hello(req, res)
+userRouter.delete("/delete", authToken, (req: Request, res: Response) =>
+  userController.deleteUser(req, res)
 );
+
+// endpoint to get user data as admin
+userRouter.get("/:userId", (req: Request, res: Response) => userController.getUserData(req, res));
+
+//  update user data.
+userRouter.put("/", (req: Request, res: Response) => userController.updateUserData(req, res));
+
+userRouter.get("/hello", (req: Request, res: Response) => userController.hello(req, res));
 
 export default userRouter;

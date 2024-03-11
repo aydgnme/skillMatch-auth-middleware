@@ -1,15 +1,15 @@
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema({
-  userId: "string",
-  name: "string",
-  email: "string",
-  password: { type: "string", default: null },
-  organizationName: { type: "string", required: true },
-  headquartersAddress: { type: "string", required: true },
-  // Role == accountType
-  accountType: { type: "string", default: "worker" },
+  userId: { type: String },
+  name: { type: String, required: true },
+  email: { type: String, required: true },
+  password: { type: String, default: null },
+  organizationName: { type: String, required: true },
+  headquartersAddress: { type: String, required: true },
+  accountType: { type: String, default: "employee" },
+  employeeSkillsId: { type: String },
 });
 
-const User = mongoose.model("user", userSchema);
+const User = mongoose.model("User", userSchema);
 export default User;
