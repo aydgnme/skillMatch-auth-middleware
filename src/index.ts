@@ -4,7 +4,7 @@ dotenv.config();
 import { logger } from "@utils";
 import Database from "./database/database.connection";
 
-const port: number = 8080;
+let port: number = 8080;
 
 async function onServerBoot() {
   const functionName: string = "onServerBoot";
