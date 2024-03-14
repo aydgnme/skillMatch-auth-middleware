@@ -13,6 +13,7 @@ steps:
   - script: |
       npm install
       npm install ts-config
+      npm install ts-node tsconfig-paths
     workingDirectory: $(projectRoot)
     displayName: "Install dependencies"
   
