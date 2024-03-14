@@ -21,7 +21,8 @@
     "mongoose": "^8.2.0",
     "nodemon": "^3.1.0",
     "ts-node": "^10.9.2",
-    "util": "^0.12.4",
+    "ts-config-paths": "^4.2.0",
+    "typescript": "^5.4.2",
     "uuid": "^9.0.1",
     "zod": "^3.22.4"
   },
