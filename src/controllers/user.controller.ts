@@ -2,9 +2,10 @@ import { config } from "@config";
 import { logger, responseSender } from "@utils";
 import { Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
-import { Organization, User, refreshToken, Url } from "@models";
+import { Organization, User, refreshToken, Url, passwordResetToken } from "@models";
 import { authUserService, hash } from "@services";
 import { updateUserSchema, UserSchema, UserType } from "@types";
+import crypto from "crypto";
 
 class UserController {
   internalError: string = "Internal server error";
@@ -317,7 +318,6 @@ class UserController {
       return responseSender.sendErrorResponse(res, 500, this.internalError);
     }
   }
-  
 
   //hello world
   async hello(req: Request, res: Response) {
@@ -329,11 +329,11 @@ class UserController {
   async updateUserData(req: Request, res: Response) {
     this.functionName = "updateUserData";
     try {
-      const userId = req.params.userId; // Extract the userId from the URL parameters
-      const updateData = req.body; // Get the update data from the request body
+      let userId = req.params.userId; // Extract the userId from the URL parameters
+      let updateData = req.body; // Get the update data from the request body
 
       // Update the user data based on userId
-      const updatedUser: any = await User.findOneAndUpdate(
+      let updatedUser: any = await User.findOneAndUpdate(
         { userId: userId }, // Find the user by userId
         { $set: updateData }, // Set the update data
         { new: true } // Return the updated document
@@ -358,6 +358,37 @@ class UserController {
     } catch (e: any) {
       logger.logError(this.functionName, e);
       return responseSender.sendErrorResponse(res, 500, this.internalError);
+    }
+  }
+
+  // forgotPassword
+  async forgotPassword(req: Request, res: Response) {
+    this.functionName = "forgotPassword";
+    try {
+      let email = req.body.email;
+      let user = await User.findOne({ email: email });
+
+      if (!user) {
+        return responseSender.sendErrorResponse(res, 404, "User not found");
+      }
+
+      let token = crypto.randomBytes(20).toString("hex");
+      let expires = new Date(Date.now() + 3600000); // Token expires in 1 hour
+
+      // Save the token to the database
+      const resetToken = new passwordResetToken({
+        token,
+        userId: user._id,
+        expires,
+      });
+      await resetToken.save();
+
+      res
+        .status(200)
+        .json({ message: "Password reset instructions sent to your email" });
+    } catch (error) {
+      console.error("Error requesting password reset:", error);
+      res.status(500).json({ message: "Error requesting password reset" });
     }
   }
 

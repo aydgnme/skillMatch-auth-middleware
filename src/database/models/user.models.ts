@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema({
   password: { type: String, default: null },
   organizationName: { type: String, required: true },
   headquartersAddress: { type: String, required: true },
-  accountType: { type: String, default: "employee" },
+  accountType: { type: Array, default: "employee" },
   employeeSkillsId: { type: String },
 });
 

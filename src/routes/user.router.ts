@@ -54,7 +54,7 @@ userRouter.put("/", (req: Request, res: Response) =>
 );
 
 // endpoint for admin to delete user. userId of user to delete is passed as parameter.
-userRouter.delete("delete/:userId", (req: Request, res: Response) =>
+userRouter.delete("/:userId", (req: Request, res: Response) =>
   userController.deleteUser(req, res)
 );
 
@@ -71,6 +71,11 @@ userRouter.get("/:userId", (req: Request, res: Response) =>
 //  update user data.
 userRouter.put("/", (req: Request, res: Response) =>
   userController.updateUserData(req, res)
+);
+
+// Forgot password
+userRouter.post("/forgotPassword", (req: Request, res: Response) =>
+  userController.forgotPassword(req, res)
 );
 
 userRouter.get("/hello", (req: Request, res: Response) =>
