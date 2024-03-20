@@ -119,7 +119,7 @@ class UserController {
 
       // Url modelini oluştururken organizationId ve url alanlarını belirtiyoruz
       await Url.create({
-        organizationId: foundOrganization._id,
+        organizationId: foundOrganization.organizationId,
         url,
         used: false,
       });

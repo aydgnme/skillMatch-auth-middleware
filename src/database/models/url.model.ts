@@ -2,7 +2,7 @@ import mongoose, {Schema} from "mongoose";
 
 
 const urlSchema = new mongoose.Schema({
-    organizationId: { type: Schema.Types.ObjectId, ref: 'Organizations', required: true },
+    organizationId: { type: Schema.Types.String, ref: 'Organizations', required: true },
     url: { type: String, required: true },
     used: { type: Boolean, required: true}
 });
